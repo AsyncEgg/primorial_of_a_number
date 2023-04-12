@@ -1,65 +1,20 @@
-use std::{fs::{File, remove_file}, io::{Read, Write}, path::Path};
-
+extern crate num_bigint; // 0.4.3
 use num_bigint::BigUint;
-use primorial_of_a_number::ThreadPool;
 
 fn main() {
-    if !Path::new("primes.txt").exists() {
-        let mut file = File::create("primes.txt").expect("Help");
-        for n in primes_less_than(100_000) {
-            file.write_all(&n.to_be_bytes()).expect("Help")
-        }    
-    }
+    let primes = primes_less_than(100_000_000);
 
-    let primes = get_primes();
-    let mut ids = vec![];
-    
-    let pool = ThreadPool::new(5);
+    println!("{}",primordial(1_000_000, &primes));
 
-    for (index, x) in (0..1000).enumerate() {
-        let primes = primes.clone();
-        pool.execute(move || {
-            let primordial = primordial(x, primes);
-            println!("{index}: {primordial}")   
-        });
-        ids.push(index);
-    }
-
-    ids.sort();
-    
-    for (count, id) in ids.iter().enumerate() {
-        assert_eq!(count, *id);
-    }
-
-    println!("Assertation completed; all threads ran correctly; executing then cleaning up");
-    remove_file("primes.txt").unwrap();
-    
 }
 
-fn primordial(n: u128, primes: Vec<u128>) -> BigUint {
+fn primordial(n: u128, primes: &Vec<u128>) -> BigUint {
     let mut result = BigUint::from(1_u8);
-
-    for x in 0..n {
-        result = BigUint::from(result) * BigUint::from(primes[x as usize]);
+    for prime in &primes[..n as usize] {
+        result *= BigUint::from(*prime)
     }
-
+    println!("done! {n}");
     result
-}
-
-fn get_primes() -> Vec<u128> {
-    let mut file = File::open("primes.txt").expect("help");
-
-    let mut buffer = [0u8; 16];
-    let mut primes = Vec::new();
-
-    while let Ok(n) = file.read(&mut buffer) {
-        if n == 0 {
-            break;
-        }
-        primes.push(u128::from_be_bytes(buffer));
-    }
-
-    primes
 }
 
 fn primes_less_than(n: u128) -> Vec<u128> {
@@ -71,8 +26,8 @@ fn primes_less_than(n: u128) -> Vec<u128> {
     
     is_prime[0] = false;
     is_prime[1] = false;
-
-    for i in 2..isqrt(n) {
+    
+    for i in 2..f64::sqrt(n as f64) as u128 {
         if is_prime[i as usize] {
             for x in (i*i..n).step_by(i as usize) {
                 is_prime[x as usize] = false
@@ -89,8 +44,4 @@ fn primes_less_than(n: u128) -> Vec<u128> {
     }
 
     result
-}
-
-fn isqrt(n: u128) -> u128 {
-    f64::sqrt(n as f64) as u128
 }
