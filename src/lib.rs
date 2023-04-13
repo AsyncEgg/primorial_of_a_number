@@ -1,94 +1,27 @@
-use std::{
-    sync::{mpsc, Arc, Mutex},
-    thread,
-};
-
-pub struct ThreadPool {
-    workers: Vec<Worker>,
-    sender: Option<mpsc::Sender<Job>>,
-}
-
-type Job = Box<dyn FnOnce() + Send + 'static>;
-
-impl ThreadPool {
-    /// Create a new ThreadPool.
-    ///
-    /// The size is the number of threads in the pool.
-    ///
-    /// # Panics
-    ///
-    /// The `new` function will panic if the size is zero.
-    pub fn new(size: usize) -> ThreadPool {
-        assert!(size > 0);
-
-        let (sender, receiver) = mpsc::channel();
-
-        let receiver = Arc::new(Mutex::new(receiver));
-
-        let mut workers = Vec::with_capacity(size);
-
-        for id in 0..size {
-            workers.push(Worker::new(id, Arc::clone(&receiver)));
-        }
-
-        ThreadPool {
-            workers,
-            sender: Some(sender),
-        }
+pub fn primes_less_than(n: u128) -> Vec<u128> {
+    
+    if n < 2 {
+        return vec![];
     }
-
-    pub fn execute<F>(&self, f: F)
-    where
-        F: FnOnce() + Send + 'static,
-    {
-        let job = Box::new(f);
-
-        self.sender.as_ref().unwrap().send(job).unwrap();
-    }
-}
-
-impl Drop for ThreadPool {
-    fn drop(&mut self) {
-        drop(self.sender.take());
-
-        for worker in &mut self.workers {
-            if worker.id == 4 {
-                println!("Shutting down last worker {}; stopping program", worker.id);
-            }
-
-            if let Some(thread) = worker.thread.take() {
-                thread.join().unwrap();
+    let mut is_prime = vec![true; n as usize];
+    
+    is_prime[0] = false;
+    is_prime[1] = false;
+    
+    for i in 2..f64::sqrt(n as f64) as u128 {
+        if is_prime[i as usize] {
+            for x in (i*i..n).step_by(i as usize) {
+                is_prime[x as usize] = false
             }
         }
     }
-}
 
-struct Worker {
-    id: usize,
-    thread: Option<thread::JoinHandle<()>>,
-}
-
-impl Worker {
-    fn new(id: usize, receiver: Arc<Mutex<mpsc::Receiver<Job>>>) -> Worker {
-        let thread = thread::spawn(move || loop {
-            let message = receiver.lock().unwrap().recv();
-
-            match message {
-                Ok(job) => {
-                    //println!("Worker {id} got a job; executing.");
-
-                    job();
-                }
-                Err(_) => {
-                    //println!("Worker {id} disconnected; shutting down.");
-                    break;
-                }
-            }
-        });
-
-        Worker {
-            id,
-            thread: Some(thread),
+    let mut result: Vec<u128> = vec![];
+    
+    for i in 0..n {
+        if is_prime[i as usize] {
+            result.push(i)
         }
     }
+    result
 }

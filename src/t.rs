@@ -2,14 +2,18 @@ extern crate num_bigint; // 0.4.3
 use num_bigint::BigUint;
 
 fn main() {
-    println!("{:?}",primordial(primes_less_than(300)))
+    let primes = primes_less_than(1_000_000);
+
+    println!("{}",primordial(1_000, &primes));
+
 }
 
-fn primordial(primes: Vec<u128>) -> BigUint {
+fn primordial(n: u128, primes: &Vec<u128>) -> BigUint {
     let mut result = BigUint::from(1_u8);
-    for prime in primes {
-        result *= BigUint::from(prime)
+    for prime in &primes[..n as usize] {
+        result *= BigUint::from(*prime)
     }
+    println!("done! {n}");
     result
 }
 
