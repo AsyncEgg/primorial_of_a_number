@@ -1,30 +1,23 @@
-use core::num;
-use std::fs::File;
-use std::io::{Write, BufReader, Read};
-use std::iter::successors;
-use std::thread;
 use std::time::Instant;
 use num_bigint::BigUint;
 
 //next step, imrpove to seive ot atkin, and load the prime numbers sequentally instead of storing them in vecs to  see if imoproves
 
 fn main() {
-    let thread_count = 7;
+    let thread_count = 9; //7
 
     let start = Instant::now();
 
-    let v = &primes_less_than(100_000_000)[0..1_000_000];
-    let duration = start.elapsed();
-    println!("seive done {duration:?}");
-
-    let start = Instant::now();
-    let chunks = v.chunks(v.len()/thread_count+1);
+    let v = &primes_less_than(15_485_867)[0..1_000_000];
+    let chunk_size = v.len()/thread_count+1;
+    println!("{}",chunk_size);
+    let chunks = v.chunks(chunk_size);
 
     let chunks = chunks.map(|chunk| chunk.to_vec()).collect::<Vec<_>>();
 
     let mut handles = vec![];
     for chunk in chunks {
-        let h = thread::spawn(move || {
+        let h = std::thread::spawn(move || {
             return multiply_vec(chunk)
         });
         handles.push(h);
@@ -38,22 +31,12 @@ fn main() {
     //try to multiply this with fold
     let duration = start.elapsed();
     println!("primorial done {duration:?}");
-
-    let start = Instant::now();
     
-    let mut file = File::create("new.txt").unwrap();
-    file.write_all(r.to_str_radix(10).as_bytes()).unwrap();
+    //let contents = r.to_str_radix(10);
+    //let num_chars = contents.chars().count();
+    //println!("{}",num_chars);
 
-    let duration = start.elapsed();
-    println!("file done {duration:?}");
-    
-    let mut file = File::open("new.txt").unwrap();
-    let mut contents = String::new();
-    file.read_to_string(&mut contents).unwrap();
-    let num_chars = contents.chars().count();
-    println!("{}",num_chars);
-
-    assert_eq!(num_chars, 6722809)
+    //assert_eq!(num_chars, 6722809)
 }
 
 fn multiply_vec(v: Vec<BigUint>) -> BigUint {
