@@ -1,53 +1,94 @@
-use std::{time::Instant, vec};
 use num_bigint::BigUint;
 
-//next step, imrpove to seive ot atkin, and load the prime numbers sequentally instead of storing them in vecs to  see if imoproves
-
 fn main() {
-    let thread_count = 9; //7
 
-    let start = Instant::now();
+    let start = std::time::Instant::now();//Timer started
 
-    let v = &optimized_sieve_of_eratosthenes(15_485_863);//holy crap i somehow kept this as a usize and converted it later??!??!!?
-    let duration = start.elapsed();
-    println!("seive done {duration:?}");
-    let start = Instant::now();
+    let primes = &optimized_sieve_of_eratosthenes(100_000);
     
-    let (first, second) = v.split_at(v.len()/2);
-
-    let result = first.iter().zip(second.iter()).map(|(a, b)| BigUint::from(*a as u128) * BigUint::from(*b as u128)).collect::<Vec<_>>();
-    //what is the fastest way to multiply a vector of numbers all together in Rust?
-    //look up vectorization 
-    //try to multiply this with fold
-    let duration = start.elapsed();
-    println!("primorial done {duration:?}");
+    let duration = start.elapsed(); //Timer Finished
+    println!("Duration of prime generation | {duration:?} |");
     
-    //let contents = r.to_str_radix(10);
-    //let num_chars = contents.chars().count();
-    //println!("{}",num_chars);
+    let start = std::time::Instant::now(); //Timer started
+    
+    //The following code splits the vector into smaller vectors; the
+    //value that controls this thread_count should be adjusted based on
+    //the size of the number of primes and the number of cpu cores you have
+    let thread_count = 9;
+    let chunk_size = primes.len()/thread_count+1; 
+    let chunks = primes.chunks(chunk_size);
+    //Chunks are converted into vectors
+    let chunks = chunks.map(|chunk| chunk.to_vec()).collect::<Vec<_>>();
 
-    //assert_eq!(num_chars, 6722809)
+    let mut handles = vec![];
+    for chunk in chunks {
+        let h = std::thread::spawn(move || { //Threads created and values multiplied
+            return multiply_vec(chunk)
+        });
+        handles.push(h);
+
+    }
+    let mut r = BigUint::from(1_u8);
+    for handle in handles { //Threads are handled here
+        let result = handle.join().unwrap();
+        r*=result;  //Final values multiplied together
+    }
+    
+    let duration = start.elapsed(); //Timer Finished
+    println!("Duration of Primorial numbers | {duration:?} |\n{}",r);
 }
-// do real testing of all functions
 
+//Fastest possible multiplication meathod
 fn multiply_vec(v: Vec<usize>) -> BigUint {
     let v = v.into_iter().fold(BigUint::from(1_u8), |acc, x| acc * x);
     BigUint::from(v)
 }
-//It makes more sense to use usize here, as the likelyhood that i will be using
-//Values that are larger than usize::MAX are low
-//using usize is also a good practice due to the way the function is used
-//comared to other rust functions.
 
-//This oprimed version of the seive of eratosthenes is faster, due to the algorithm taking less calculatons
-fn optimized_sieve_of_eratosthenes(limit: usize) -> Vec<usize> {
-    if limit < 2 {
-        return Vec::new();
+//Function inspired from https://www.geeksforgeeks.org/binary-search/
+
+//Function uses the Babylonian meathod for finding squre roots which is
+//faster than rust's built in sqrt() function.
+fn sqrt_binary_search(n: usize) -> usize { 
+    let mut low = 0;
+    let mut high = n;
+
+    while low <= high {
+        let mid = (low + high) / 2;
+        let square = mid * mid;
+
+        if square == n {
+            return mid;
+        } else if square < n {
+            low = mid + 1;
+        } else {
+            high = mid - 1;
+        }
     }
-    //find bettr ways to do things :D
+
+    low - 1
+}
+
+//This oprimed version of the seive of eratosthenes is
+//faster, due to the algorithm taking less calculatons.
+
+//It makes more sense to use usize here, as the likelyhood that i will be using
+//values that are larger than usize::MAX are low; but if needed the
+//function can be tweaked to use BigUints which is limited by
+//the ammount of ram your computer has.
+
+//Using usize is also a good practice due to the way the function is used
+//comared to other rust functions.
+fn optimized_sieve_of_eratosthenes(number_of_primes: usize) -> Vec<usize> {
+    if number_of_primes == 0 {
+        return vec![1];//return vec if limit is 0
+    }
+    if number_of_primes == 1 {
+        return vec![2];//return vec if limit is 1
+    }
+    //:D
     let mut primes = vec![2];
-    let sieve_limit = (limit - 1) / 2;
-    let cross_limit = ((((limit as f64).sqrt()) as usize - 1) / 2) as usize; //improve this line
+    let sieve_limit = (number_of_primes - 1) / 2;
+    let cross_limit = (sqrt_binary_search(number_of_primes) - 1) / 2; //improve this line
     let mut sieve = vec![false; sieve_limit + 1];
 
     for i in 1..=cross_limit {
@@ -58,7 +99,7 @@ fn optimized_sieve_of_eratosthenes(limit: usize) -> Vec<usize> {
             }
         }
     }
-
+    //check primes
     for i in 1..=sieve_limit {
         if !sieve[i] {
             primes.push(2 * i + 1);
