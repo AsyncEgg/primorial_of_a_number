@@ -12,12 +12,25 @@ fn main() {
     let duration = start.elapsed();
     println!("seive done {duration:?}");
     let start = Instant::now();
-    
-    let (first, second) = v.split_at(v.len()/2);
+    let chunk_size = v.len()/thread_count+1;
 
-    let result = first.iter().zip(second.iter()).map(|(a, b)| BigUint::from(*a as u128) * BigUint::from(*b as u128)).collect::<Vec<_>>();
-    //what is the fastest way to multiply a vector of numbers all together in Rust?
-    //look up vectorization 
+    let chunks = v.chunks(chunk_size);
+
+    let chunks = chunks.map(|chunk| chunk.to_vec()).collect::<Vec<_>>();
+
+    let mut handles = vec![];
+    for chunk in chunks {
+        let h = std::thread::spawn(move || {
+            return multiply_vec(chunk)
+        });
+        handles.push(h);
+
+    }
+    let mut r = BigUint::from(1_u8);
+    for handle in handles {
+        let result = handle.join().unwrap();
+        r*=result;
+    }
     //try to multiply this with fold
     let duration = start.elapsed();
     println!("primorial done {duration:?}");
