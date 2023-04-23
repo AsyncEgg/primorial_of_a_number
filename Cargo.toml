@@ -10,4 +10,8 @@ lto = true
 
 
 [dependencies]
+crossterm = "0.26.1"
 num-bigint = "0.4.3"
+tui = "0.19.0"
+unicode-width = "0.1.7"
+textwrap = "0.16"

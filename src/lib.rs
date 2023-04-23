@@ -1,15 +1,16 @@
+use std::{time::Duration, fs::File, io::{BufWriter, Write}};
+
 use num_bigint::BigUint;
 
-pub fn primorial(number_of_primes: usize) -> BigUint {
+pub fn primorial(number_of_primes: usize) -> (BigUint, Duration, Duration) {
 
-    let start = std::time::Instant::now();//Timer started
+    let prime_start = std::time::Instant::now();//Timer started
 
     let primes = &optimized_sieve_of_eratosthenes(number_of_primes*16)[0..number_of_primes];
     
-    let duration = start.elapsed(); //Timer Finished
-    println!("Duration of prime generation | {duration:?} |");
+    let prime_duration = prime_start.elapsed(); //Timer Finished
     
-    let start = std::time::Instant::now(); //Timer started
+    let primorial_start = std::time::Instant::now(); //Timer started
     
     //The following code splits the vector into smaller vectors; the
     //value that controls this thread_count should be adjusted based on
@@ -22,10 +23,10 @@ pub fn primorial(number_of_primes: usize) -> BigUint {
 
     let mut handles = vec![];
     for chunk in chunks {
-        let h = std::thread::spawn(move || { //Threads created and values multiplied
+        let handle = std::thread::spawn(move || { //Threads created and values multiplied
             return multiply_vec(chunk)
         });
-        handles.push(h);
+        handles.push(handle);
 
     }
     let mut r = BigUint::from(1_u8);
@@ -34,9 +35,8 @@ pub fn primorial(number_of_primes: usize) -> BigUint {
         r*=result;  //Final values multiplied together
     }
     
-    let duration = start.elapsed(); //Timer Finished
-    println!("Duration of Primorial numbers | {duration:?} |");
-    r
+    let primorial_duration = primorial_start.elapsed(); //Timer Finished
+    (r, prime_duration, primorial_duration)
 }
 //Fastest possible multiplication meathod
 fn multiply_vec(v: Vec<usize>) -> BigUint {
@@ -107,4 +107,89 @@ pub fn optimized_sieve_of_eratosthenes(number_of_primes: usize) -> Vec<usize> {
     }
 
     primes
+}
+
+#[derive(Copy, Clone, Debug)]
+pub enum WriteMode {
+    Bin,
+    Txt,
+    None
+}
+
+pub fn write_biguint_to_file(biguint: BigUint, write_mode: &WriteMode) -> std::io::Result<String> {
+    
+    match write_mode {
+        &WriteMode::Bin => {
+            let start = std::time::Instant::now();//Timer started
+
+            let bytes = biguint.to_bytes_le();
+
+            let file = File::create("biguint_data.bin")?;
+            let mut writer = BufWriter::new(file);
+        
+            writer.write_all(&bytes)?;
+        
+            writer.flush()?;
+            
+            let duration = start.elapsed();
+            Ok(format!("{:?}",duration))//Elapsed time return
+        }
+        &WriteMode::Txt => {
+            let start = std::time::Instant::now();//Timer started
+
+            let string = biguint.to_str_radix(10);
+
+            let file = File::create("biguint_base10.txt")?;
+            let mut buffered_writer = BufWriter::new(file);
+            write!(buffered_writer, "{}", string)?;
+
+            let duration = start.elapsed();
+            Ok(format!("{:?}",duration))//Elapsed time return
+        }
+        &WriteMode::None => {
+            Ok(String::from("No file created"))
+        }
+    }
+}
+
+pub enum ReadMode {
+    Bin,
+    Txt,
+    None
+}
+
+pub fn read_file_to_biguint(biguint: BigUint, read_mode: &ReadMode) -> std::io::Result<String> {
+    
+    match read_mode {
+        &ReadMode::Bin => {
+            let start = std::time::Instant::now();//Timer started
+
+            let bytes = biguint.to_bytes_le();
+
+            let file = File::create("biguint_data.bin")?;
+            let mut writer = BufWriter::new(file);
+        
+            writer.write_all(&bytes)?;
+        
+            writer.flush()?;
+            
+            let duration = start.elapsed();
+            Ok(format!("{:?}",duration))//Elapsed time return
+        }
+        &ReadMode::Txt => {
+            let start = std::time::Instant::now();//Timer started
+
+            let string = biguint.to_str_radix(10);
+
+            let file = File::create("biguint_base10.txt")?;
+            let mut buffered_writer = BufWriter::new(file);
+            write!(buffered_writer, "{}", string)?;
+
+            let duration = start.elapsed();
+            Ok(format!("{:?}",duration))//Elapsed time return
+        }
+        &ReadMode::None => {
+            Ok(String::from("No file read"))
+        }
+    }
 }
