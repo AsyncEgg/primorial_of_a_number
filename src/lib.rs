@@ -1,4 +1,4 @@
-use std::{time::Duration, fs::File, io::{BufWriter, Write}};
+use std::{time::Duration, fs::File, io::{BufWriter, Write, BufReader, Read}};
 
 use num_bigint::BigUint;
 
@@ -147,7 +147,7 @@ pub fn write_biguint_to_file(biguint: BigUint, write_mode: &WriteMode) -> std::i
             Ok(format!("{:?}",duration))//Elapsed time return
         }
         &WriteMode::None => {
-            Ok(String::from("No file created"))
+            Ok(String::from("No file"))
         }
     }
 }
@@ -158,38 +158,35 @@ pub enum ReadMode {
     None
 }
 
-pub fn read_file_to_biguint(biguint: BigUint, read_mode: &ReadMode) -> std::io::Result<String> {
+pub fn read_file_to_biguint(read_mode: &ReadMode) -> std::io::Result<(String, String)> {
     
     match read_mode {
         &ReadMode::Bin => {
             let start = std::time::Instant::now();//Timer started
 
-            let bytes = biguint.to_bytes_le();
 
             let file = File::create("biguint_data.bin")?;
             let mut writer = BufWriter::new(file);
         
-            writer.write_all(&bytes)?;
         
             writer.flush()?;
             
             let duration = start.elapsed();
-            Ok(format!("{:?}",duration))//Elapsed time return
+            Ok((format!("{:?}",duration), String::from("")))//Elapsed time return
         }
         &ReadMode::Txt => {
             let start = std::time::Instant::now();//Timer started
 
-            let string = biguint.to_str_radix(10);
-
-            let file = File::create("biguint_base10.txt")?;
-            let mut buffered_writer = BufWriter::new(file);
-            write!(buffered_writer, "{}", string)?;
+            let file = File::open("biguint_base10.txt")?;
+            let mut buf_reader = BufReader::new(file);
+            let mut contents = String::new();
+            buf_reader.read_to_string(&mut contents)?;
 
             let duration = start.elapsed();
-            Ok(format!("{:?}",duration))//Elapsed time return
+            Ok((format!("{:?}",duration), contents))//Elapsed time return
         }
         &ReadMode::None => {
-            Ok(String::from("No file read"))
+            Ok((String::from("No file"), String::from("No file")))
         }
     }
 }

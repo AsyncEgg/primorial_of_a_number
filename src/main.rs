@@ -3,7 +3,7 @@ use crossterm::{
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
-use std::{error::Error, io, process::Output, fmt::Write, thread};
+use std::{error::Error, io, process::Output, fmt::Write, thread, fs::File};
 use tui::{
     backend::{Backend, CrosstermBackend},
     layout::{Constraint, Direction, Layout},
@@ -13,10 +13,11 @@ use tui::{
 };
 use unicode_width::UnicodeWidthStr;
 
-use primorial_of_a_number::{primorial, WriteMode, write_biguint_to_file};
+use primorial_of_a_number::{primorial, WriteMode, write_biguint_to_file, read_file_to_biguint, ReadMode};
 
 enum FileWindowMode {
     Read,
+    None,
     Write
 }
 
@@ -48,24 +49,21 @@ impl Default for App {
             scroll_position: 0,
             write_mode: WriteMode::None,
             output_mode: OutputMode::Message,
-            file_window_mode: FileWindowMode::Write,
+            file_window_mode: FileWindowMode::None,
         }
     }
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    // setup terminal
     enable_raw_mode()?;
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    // create app and run it
     let app = App::default();
     let res = run_app(&mut terminal, app);
 
-    // restore terminal
     disable_raw_mode()?;
     execute!(
         terminal.backend_mut(),
@@ -108,7 +106,7 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> io::Result<(
                     }
 
                     KeyCode::Enter => {
-
+                        app.file_window_mode = FileWindowMode::None;
                         app.scroll_position = 0;
 
                         let drain: String = app.input.drain(..).collect();
@@ -134,6 +132,7 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> io::Result<(
                         }
 
                         if drain.contains("write") {
+                            app.file_window_mode = FileWindowMode::Write;
                             app.output_mode = OutputMode::Message;
                             let option = drain.split_once(" ");
 
@@ -159,26 +158,23 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> io::Result<(
                         }
 
                         if drain.contains("read") {
+                            app.file_window_mode = FileWindowMode::Read;
                             app.output_mode = OutputMode::Message;
                             let option = drain.split_once(" ");
 
                             match option {
                                 Some(("read", "bin")) => {
-                                    app.write_mode = WriteMode::Bin;
                                     app.output = String::from("Write mode bin selected, enter value; value will be saved")
                                 }
                                 Some(("read", "txt")) => {
-                                    app.write_mode = WriteMode::Txt;
-                                    app.output = String::from("Write mode txt selected, enter value; value will be saved")
+                                    app.output_mode = OutputMode::Number;
+                                    (app.file_status, app.output) = read_file_to_biguint(&ReadMode::Txt).unwrap()
 
                                 }
-                                Some(("read", "none")) => {
-                                    app.write_mode = WriteMode::None;
-                                    app.output = String::from("Write mode none selected, enter value; value will be saved")
-                                }
-                                Some((_,_)) => {app.output = String::from("Error: Invalid write option; Valid options: \"bin\" \"txt\" \"none\"")}
+                                Some((_,_)) => {app.output = String::from("Error: Invalid write option; Valid options: \"bin\" \"txt\"")}
+
                                 None => {
-                                    app.output = String::from("Error: Invalid write option; Valid options: \"bin\" \"txt\" \"none\"")
+                                    app.output = String::from("Error: Invalid write option; Valid options: \"bin\" \"txt\"")
                                 }
                             }
                         }
@@ -236,13 +232,10 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &App) {
 
     let input = Paragraph::new(app.input.as_ref())
         .style(Style::default().add_modifier(Modifier::BOLD).fg(Color::Yellow))
-        .block(Block::default().borders(Borders::ALL).title("Input"));
+        .block(Block::default().borders(Borders::ALL).title("Primorial Number Finder"));
     f.render_widget(input, chunks[2]);
-    // Make the cursor visible and ask tui-rs to put it at the specified coordinates after rendering
     f.set_cursor(
-        // Put cursor past the end of the input text
         chunks[1].x + app.input.width() as u16 + 1,
-        // Move one line down, from the border to the input line
         chunks[1].y + 2,
     );
 
@@ -272,14 +265,21 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &App) {
 
     match app.file_window_mode {
         FileWindowMode::Write => {
-            let status = Paragraph::new(format!("{}\n{:?}",app.file_status, app.write_mode))
+            let status = Paragraph::new(format!("{}\nWrite: {:?}",app.file_status, app.write_mode))
                 .style(Style::default().add_modifier(Modifier::ITALIC))
                 .block(Block::default().borders(Borders::ALL).title("File Duration"));
 
             f.render_widget(status, left_chunks[2]);
         }
         FileWindowMode::Read => {
-            let status = Paragraph::new(format!("{}\n{:?}",app.file_status, app.write_mode))
+            let status = Paragraph::new(format!("{}\nRead",app.file_status))
+                .style(Style::default().add_modifier(Modifier::ITALIC))
+                .block(Block::default().borders(Borders::ALL).title("File Duration"));
+
+            f.render_widget(status, left_chunks[2]);
+        }
+        FileWindowMode::None => {
+            let status = Paragraph::new(format!("{}",app.file_status))
                 .style(Style::default().add_modifier(Modifier::ITALIC))
                 .block(Block::default().borders(Borders::ALL).title("File Duration"));
 
@@ -317,7 +317,7 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &App) {
 
     f.render_widget(output, bottom_chunks[1]);
 
-    let instructions = Paragraph::new("type \"q\" or \"quit\" to quit | press ENTER to submit number | type \"write\" to write data to file | \"read\" to Read Data from file")
+    let instructions = Paragraph::new("type \"q\" or \"quit\" to quit | press ENTER to submit number | use arrow keys to scroll | type \"write\" to write data to file | \"read\" to Read Data from file")
         .style(Style::default().add_modifier(Modifier::BOLD).fg(Color::Yellow))
         .block(Block::default().borders(Borders::ALL));
 
