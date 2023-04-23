@@ -1,4 +1,4 @@
-use std::{time::Duration, fs::File, io::{BufWriter, Write, BufReader, Read}};
+use std::{time::Duration, fs::File, io::{BufWriter, Write, BufReader, Read}, str::FromStr};
 
 use num_bigint::BigUint;
 
@@ -24,7 +24,7 @@ pub fn primorial(number_of_primes: usize) -> (BigUint, Duration, Duration) {
     let mut handles = vec![];
     for chunk in chunks {
         let handle = std::thread::spawn(move || { //Threads created and values multiplied
-            return multiply_vec(chunk)
+            multiply_vec(chunk)
         });
         handles.push(handle);
 
@@ -40,8 +40,7 @@ pub fn primorial(number_of_primes: usize) -> (BigUint, Duration, Duration) {
 }
 //Fastest possible multiplication meathod
 fn multiply_vec(v: Vec<usize>) -> BigUint {
-    let v = v.into_iter().fold(BigUint::from(1_u8), |acc, x| acc * x);
-    BigUint::from(v)
+    v.into_iter().fold(BigUint::from(1_u8), |acc, x| acc * x)
 }
 
 //Function inspired from https://www.geeksforgeeks.org/binary-search/
@@ -158,21 +157,20 @@ pub enum ReadMode {
     None
 }
 
-pub fn read_file_to_biguint(read_mode: &ReadMode) -> std::io::Result<(String, String)> {
+pub fn read_file_to_biguint(read_mode: &ReadMode) -> std::io::Result<(String, String, BigUint)> {
     
     match read_mode {
         &ReadMode::Bin => {
             let start = std::time::Instant::now();//Timer started
 
 
-            let file = File::create("biguint_data.bin")?;
-            let mut writer = BufWriter::new(file);
-        
-        
-            writer.flush()?;
+            let mut file = File::open("biguint_data.bin")?;
+            let mut bytes = Vec::new();
+            file.read_to_end(&mut bytes)?;
+            let biguint = BigUint::from_bytes_le(&bytes);
             
             let duration = start.elapsed();
-            Ok((format!("{:?}",duration), String::from("")))//Elapsed time return
+            Ok((format!("{:?}",duration), biguint.to_str_radix(10), biguint))//Elapsed time return
         }
         &ReadMode::Txt => {
             let start = std::time::Instant::now();//Timer started
@@ -183,10 +181,10 @@ pub fn read_file_to_biguint(read_mode: &ReadMode) -> std::io::Result<(String, St
             buf_reader.read_to_string(&mut contents)?;
 
             let duration = start.elapsed();
-            Ok((format!("{:?}",duration), contents))//Elapsed time return
+            Ok((format!("{:?}",duration), contents.clone(), BigUint::from_str(&contents).unwrap()))//Elapsed time return
         }
         &ReadMode::None => {
-            Ok((String::from("No file"), String::from("No file")))
+            Ok((String::from("No file"), String::new(), BigUint::new(vec![])))
         }
     }
 }

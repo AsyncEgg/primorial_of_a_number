@@ -3,13 +3,13 @@ use crossterm::{
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
-use std::{error::Error, io, process::Output, fmt::Write, thread, fs::File};
+use std::{error::Error, io, thread};
 use tui::{
     backend::{Backend, CrosstermBackend},
     layout::{Constraint, Direction, Layout},
     style::{Color, Style, Modifier},
-    widgets::{Block, Borders, Paragraph, ListItem, List, BorderType},
-    Frame, Terminal, text::{Spans, Span},
+    widgets::{Block, Borders, Paragraph},
+    Frame, Terminal,
 };
 use unicode_width::UnicodeWidthStr;
 
@@ -160,15 +160,18 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> io::Result<(
                         if drain.contains("read") {
                             app.file_window_mode = FileWindowMode::Read;
                             app.output_mode = OutputMode::Message;
+                            app.primes_status = String::from("No number generated");
+                            app.primorial_status = String::from("No number generated");
                             let option = drain.split_once(" ");
 
                             match option {
                                 Some(("read", "bin")) => {
-                                    app.output = String::from("Write mode bin selected, enter value; value will be saved")
+                                    app.output_mode = OutputMode::Number;
+                                    (app.file_status, app.output, _) = read_file_to_biguint(&ReadMode::Bin).unwrap()
                                 }
                                 Some(("read", "txt")) => {
                                     app.output_mode = OutputMode::Number;
-                                    (app.file_status, app.output) = read_file_to_biguint(&ReadMode::Txt).unwrap()
+                                    (app.file_status, app.output, _) = read_file_to_biguint(&ReadMode::Txt).unwrap()
 
                                 }
                                 Some((_,_)) => {app.output = String::from("Error: Invalid write option; Valid options: \"bin\" \"txt\"")}
@@ -232,7 +235,7 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &App) {
 
     let input = Paragraph::new(app.input.as_ref())
         .style(Style::default().add_modifier(Modifier::BOLD).fg(Color::Yellow))
-        .block(Block::default().borders(Borders::ALL).title("Primorial Number Finder"));
+        .block(Block::default().borders(Borders::ALL).title("Primorial Number Generator"));
     f.render_widget(input, chunks[2]);
     f.set_cursor(
         chunks[1].x + app.input.width() as u16 + 1,
