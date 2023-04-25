@@ -15,6 +15,12 @@ use unicode_width::UnicodeWidthStr;
 
 use primorial_of_a_number::{primorial, WriteMode, write_biguint_to_file, read_file_to_biguint, ReadMode};
 
+#[derive(Debug)]
+enum OutputSwitch {
+    Enabled,
+    Disabled
+}
+
 enum FileWindowMode {
     Read,
     None,
@@ -35,7 +41,8 @@ struct App {
     scroll_position: u16,
     write_mode: WriteMode,
     output_mode: OutputMode, 
-    file_window_mode: FileWindowMode
+    file_window_mode: FileWindowMode,
+    output_switch: OutputSwitch
 }
 
 impl Default for App {
@@ -50,6 +57,7 @@ impl Default for App {
             write_mode: WriteMode::None,
             output_mode: OutputMode::Message,
             file_window_mode: FileWindowMode::None,
+            output_switch: OutputSwitch::Enabled
         }
     }
 }
@@ -108,7 +116,7 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> io::Result<(
                     KeyCode::Enter => {
                         app.file_window_mode = FileWindowMode::None;
                         app.scroll_position = 0;
-
+                        
                         let drain: String = app.input.drain(..).collect();
 
                         if drain == String::from("quit") || drain == String::from("q") {
@@ -121,7 +129,15 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> io::Result<(
                         } else {
                             app.output_mode = OutputMode::Number;
                             let (output,prime_duration,primorial_duration)  = primorial(drain.parse::<usize>().unwrap());
-                            app.output = output.to_str_radix(10);
+
+                            match app.output_switch {
+                                OutputSwitch::Enabled => {
+                                    app.output = output.to_str_radix(10);
+                                    
+                                }
+                                OutputSwitch::Disabled => app.output = "Output disabled; Type output enable to enable output".to_string()
+                            }
+                            
                             app.primes_status = format!("{:?}",prime_duration);
                             app.primorial_status = format!("{:?}",primorial_duration);
 
@@ -129,6 +145,25 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> io::Result<(
                                 return write_biguint_to_file(output, &app.write_mode)
                             }).join().unwrap().unwrap();
 
+                        }
+
+                        if drain.contains("output") {
+                            app.output_mode = OutputMode::Message;
+                            let option = drain.split_once(" ");
+
+                            match option {
+                                Some(("output", "enable")) => {
+                                    app.output_switch = OutputSwitch::Enabled;
+                                    app.output = String::from("Output enabled")
+                                }
+                                Some(("output", "disable")) => {
+                                    app.output_switch = OutputSwitch::Disabled;
+                                    app.output = String::from("Output disabled")
+
+                                }
+                                Some((_,_)) => {app.output = String::from("Error: Invalid write option; Valid options: \"enable\" \"disable\"")}
+                                None => {app.output = String::from("Error: Invalid write option; Valid options: \"enable\" \"disable\"")}
+                            }
                         }
 
                         if drain.contains("write") {
@@ -202,7 +237,7 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &App) {
         .constraints(
             [
                 Constraint::Min(0),
-                Constraint::Length(3)
+                Constraint::Length(4)
             ]
             .as_ref(),
         )
@@ -290,39 +325,52 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &App) {
         }
     }
 
-    
-
     let chunk_width = bottom_chunks[1].width -  9;
 
-    let output: Vec<String> = app.output
-        .chars()
-        .collect::<Vec<_>>()
-        .chunks(chunk_width.into())
-        .into_iter()
-        .map(|chunk| chunk.into_iter().collect::<String>())
-        .enumerate()
-        .map(|(i,s)|{
-            return match app.output_mode {
-                OutputMode::Number => format!("{}~ {}",i+1,s ).to_string(),
-                OutputMode::Message => s
-            }
-        })
-        .collect();
+    let output;
 
-
-    let output = output.join("\n");
-
+    match app.output_switch {
+        OutputSwitch::Enabled => {
+            output = string_wrap(&app.output, chunk_width, &app.output_mode);
+        }
+        OutputSwitch::Disabled => {
+            output = "Output disabled; Type output enable to enable output".to_string();
+        }
+    }
+    
 
     let output = Paragraph::new(output)
         .style(Style::default().fg(Color::White))
-        .block(Block::default().title("Output").borders(Borders::ALL))
+        .block(Block::default().title(format!("Output: {:?}", app.output_switch)).borders(Borders::ALL))
         .scroll((app.scroll_position, 0));
 
     f.render_widget(output, bottom_chunks[1]);
 
-    let instructions = Paragraph::new("type \"q\" or \"quit\" to quit | press ENTER to submit number | use arrow keys to scroll | type \"write\" to write data to file | \"read\" to Read Data from file")
+    let instructions = String::from("type \"q\" or \"quit\" to quit | press ENTER to submit number | use arrow keys to scroll | type \"write\" to write data to file | type \"read\" to Read Data from file | type \"output\" to enable or disable output");
+
+    let instructions = string_wrap(&instructions, outer_chunks[1].width - 3, &OutputMode::Message);
+
+    let instructions = Paragraph::new(instructions)
         .style(Style::default().add_modifier(Modifier::BOLD).fg(Color::Yellow))
         .block(Block::default().borders(Borders::ALL));
 
     f.render_widget(instructions, outer_chunks[1]);
+}
+
+fn string_wrap(string: &String, chunk_width: u16, output_mode: &OutputMode) -> String {
+    string
+    .chars()
+    .collect::<Vec<_>>()
+    .chunks(chunk_width.into())
+    .into_iter()
+    .map(|chunk| chunk.into_iter().collect::<String>())
+    .enumerate()
+    .map(|(i,s)|{
+        return match output_mode {
+            OutputMode::Number => format!("{}~ {}",i+1,s ).to_string(),
+            OutputMode::Message => s
+        }
+    })
+    .collect::<Vec<String>>()
+    .join("\n")
 }

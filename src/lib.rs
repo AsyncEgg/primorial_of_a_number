@@ -1,4 +1,4 @@
-use std::{time::Duration, fs::File, io::{BufWriter, Write, BufReader, Read}, str::FromStr};
+use std::{time::Duration, fs::File, io::{BufWriter, Write, BufReader, Read}, str::FromStr, thread};
 
 use num_bigint::BigUint;
 
@@ -115,39 +115,43 @@ pub enum WriteMode {
     None
 }
 
-pub fn write_biguint_to_file(biguint: BigUint, write_mode: &WriteMode) -> std::io::Result<String> {
-    
+pub fn write_biguint_to_file(biguint: num_bigint::BigUint, write_mode: &WriteMode) -> Result<String, std::io::Error> {
     match write_mode {
-        &WriteMode::Bin => {
-            let start = std::time::Instant::now();//Timer started
-
+        WriteMode::Bin => {
+            let start = std::time::Instant::now();
             let bytes = biguint.to_bytes_le();
 
-            let file = File::create("biguint_data.bin")?;
-            let mut writer = BufWriter::new(file);
-        
-            writer.write_all(&bytes)?;
-        
-            writer.flush()?;
-            
-            let duration = start.elapsed();
-            Ok(format!("{:?}",duration))//Elapsed time return
-        }
-        &WriteMode::Txt => {
-            let start = std::time::Instant::now();//Timer started
+            let thread_handle = thread::spawn(move || {
+                
+                let file = File::create("biguint_data.bin")?;
+                let mut writer = BufWriter::new(file);
+                writer.write_all(&bytes)?;
+                writer.flush()?;
+                
+                Ok::<(), std::io::Error>(())
+            });
 
+            thread_handle.join().unwrap()?;
+            let duration = start.elapsed();
+            Ok(format!("{:?}",duration))
+        }
+        WriteMode::Txt => {
+            let start = std::time::Instant::now();
             let string = biguint.to_str_radix(10);
 
-            let file = File::create("biguint_base10.txt")?;
-            let mut buffered_writer = BufWriter::new(file);
-            write!(buffered_writer, "{}", string)?;
+            let thread_handle = thread::spawn(move || {
+                
+                let file = File::create("biguint_base10.txt")?;
+                let mut buffered_writer = BufWriter::new(file);
+                write!(buffered_writer, "{}", string)?;
+                Ok::<(), std::io::Error>(())
+            });
 
+            thread_handle.join().unwrap()?;
             let duration = start.elapsed();
-            Ok(format!("{:?}",duration))//Elapsed time return
+            Ok(format!("{:?}",duration))
         }
-        &WriteMode::None => {
-            Ok(String::from("No file"))
-        }
+        WriteMode::None => Ok(String::from("No file")),
     }
 }
 
