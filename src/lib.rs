@@ -2,6 +2,9 @@ use std::{time::Duration, fs::File, io::{BufWriter, Write, BufReader, Read}, str
 
 use num_bigint::BigUint;
 
+//The primorial of a number is the multiplication of n primes.
+//first 6 prime numbers
+//E.g. 6 -> 2×3×5×7×11×13 -> 30030
 pub fn primorial(number_of_primes: usize) -> (BigUint, Duration, Duration) {
 
     let prime_start = std::time::Instant::now();//Timer started
