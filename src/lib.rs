@@ -8,7 +8,7 @@ use num_bigint::BigUint;
 pub fn primorial(number_of_primes: usize) -> (BigUint, Duration, Duration) {
 
     let prime_start = std::time::Instant::now();//Timer started
-
+    //stores n number of primes needed
     let primes = &optimized_sieve_of_eratosthenes(number_of_primes*16)[0..number_of_primes];
     
     let prime_duration = prime_start.elapsed(); //Timer Finished
